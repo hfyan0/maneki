@@ -30,7 +30,9 @@ class Strategy:
         self.initiated, self.CONST_BUY, self.CONST_SELL = True, 1, 2
         self.signal_list =[]
 
-        today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d") + timedelta(-1), "%Y-%m-%d")
+    def doMarketAction(self, config, mgr, action_type, start_date):
+        # today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d") + timedelta(-1), "%Y-%m-%d")
+        today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y-%m-%d")
         self.daily_adjust_ratio_dict = self.dp.get_daily_adjust_ratio(today_date)
         print "==========================entry market action type=============================="
 
@@ -162,6 +164,8 @@ class Strategy:
         print "PnL ",pnlfeed.dailyPnL,pnlfeed.monthlyPnL,pnlfeed.yearlyPnL
         return
 
+    def get_symbols_for_realtime_monitoring(self):
+        return self.dp.get_symbols_for_realtime_monitoring()
 
 class DataProcessing:
     historical_daily_ohlc_list, historical_hourly_ohlc_list, market_calendar = [], [], []
@@ -505,9 +509,9 @@ class DataProcessing:
         print_save_log(self.log, msg)
         self.hourly_ohlc_list_for_db = []
 
-    def save_signal_to_db(self, timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
-        str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s')" % (
-            str(timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id)
+    def save_signal_to_db(self, update_timestamp, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
+        str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s')" % (
+            str(update_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str(update_timestamp), str(signal_timestamp))
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
 
@@ -535,6 +539,16 @@ class DataProcessing:
                     ('%s', %s, %s, '%s','%s');"
         self.da.insert_many_command(daily_portfolio_list, str_insert)
 
+    def get_symbols_for_realtime_monitoring(self):
+        ls_symbols=[]
+
+        for symtup in self.da.query_command("select instrument_id from " + self.tb_portfolios + " where strategy_id='" + self.strategy_id + "'"):
+          ls_symbols.append(symtup[0])
+
+        for symtup in self.da.query_command("select instrument_id from " + self.tb_signals + " where status=0 and strategy_id='" + self.strategy_id + "'"):
+          ls_symbols.append(symtup[0])
+
+        return sorted(set(ls_symbols))
 
 class DataAccess:
     print "****************Start initialize data DataAccess class****************"
@@ -762,7 +776,7 @@ class ManekiStrategy:
                 signal_comment = "buy_order_id: " + str(buy_order_id) + ", stop_loss_price: " + str(
                     self.stop_loss_price) + " , exit_condition_cv_price_min: " + str(
                     exit_condition_cv_price_min) + ", before_buy_cash: " + str(self.available_cash)
-                sell_signal_id = self.dp.save_signal_to_db(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment)
+                sell_signal_id = self.dp.save_signal_to_db(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment, timestamp, timestamp)
                 sell_signal_feed.append(
                     [sell_signal_id, status, timestamp, product, buy_sell, current_price, order_volume, buy_order_id])
                 is_trigger_bool = True
@@ -1073,13 +1087,18 @@ if __name__ == '__main__':
         mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", time.strftime("%Y%m%d"), time.strftime("%Y%m%d"))
         mgr.start()
         myStrategy = Strategy("", mgr, action_type, start_date)
+        symbolsRTmonitor = myStrategy.get_symbols_for_realtime_monitoring()
+        myStrategy.doMarketAction("", mgr, action_type, start_date)
         if action_type == "market_close":
             sys.exit()
         elif action_type == "market_open":
-            with open('hkstocklist.txt','r') as f:
-                for line in f:
-                  line = line.strip()
-                  mgr.subscribeMarketData(myStrategy.onMarketDataUpdate, "HKSE", line)
+            for sym in symbolsRTmonitor:
+                print "Subscribing symbol: " + sym
+                mgr.subscribeMarketData(myStrategy.onMarketDataUpdate, "HKSE", sym)
+            # with open('hkstocklist.txt','r') as f:
+            #     for line in f:
+            #       line = line.strip()
+            #       mgr.subscribeMarketData(myStrategy.onMarketDataUpdate, "HKSE", line)
             mgr.registerOrderFeed(myStrategy.onOrderFeed)
             mgr.registerTradeFeed(myStrategy.onTradeFeed)
             mgr.registerPortfolioFeed(myStrategy.onPortfolioFeed)
