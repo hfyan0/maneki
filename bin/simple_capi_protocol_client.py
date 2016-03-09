@@ -512,7 +512,7 @@ class DataProcessing:
     def save_signal_to_db(self, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
         str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
         str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s')" % (
-            str_time_now, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp))
+            str(signal_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp))
 
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
