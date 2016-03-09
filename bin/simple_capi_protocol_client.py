@@ -509,9 +509,11 @@ class DataProcessing:
         print_save_log(self.log, msg)
         self.hourly_ohlc_list_for_db = []
 
-    def save_signal_to_db(self, update_timestamp, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
+    def save_signal_to_db(self, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
+        str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
         str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s')" % (
-            str(update_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str(update_timestamp), str(signal_timestamp))
+            str_time_now, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp))
+
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
 
@@ -776,7 +778,7 @@ class ManekiStrategy:
                 signal_comment = "buy_order_id: " + str(buy_order_id) + ", stop_loss_price: " + str(
                     self.stop_loss_price) + " , exit_condition_cv_price_min: " + str(
                     exit_condition_cv_price_min) + ", before_buy_cash: " + str(self.available_cash)
-                sell_signal_id = self.dp.save_signal_to_db(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment, timestamp, timestamp)
+                sell_signal_id = self.dp.save_signal_to_db(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment)
                 sell_signal_feed.append(
                     [sell_signal_id, status, timestamp, product, buy_sell, current_price, order_volume, buy_order_id])
                 is_trigger_bool = True
