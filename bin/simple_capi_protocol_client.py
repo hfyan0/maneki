@@ -57,6 +57,8 @@ class Strategy:
             # self.ms.daily_realized_pnl_dict.clear()
             print str(self.current_timestamp) + " buy signals already generated."
 
+            self.dp.update_order_trigger_sell_signal()
+
         elif action_type == "market_open":
             print "entry market open case"
             self.dp.load_historical_daily_stock_price(self.dp.historical_daily_price_start_date)
@@ -532,6 +534,12 @@ class DataProcessing:
         str_order_update = "update " + self.tb_orders + " set available_position=" + str(available_position) + ", trigger_sell_signal=" + str(trigger_sell_signal) + " where order_id=" + str(order_id) + ";"
         self.da.execute_command(str_order_update)
         msg = str(datetime.now()) + "Updating order available position, order_id: " + str(order_id) + ", trigger_sell_signal=" + str(trigger_sell_signal) + " available_position: " + str(available_position)
+        print print_save_log(self.log, msg)
+
+    def update_order_trigger_sell_signal(self):
+        str_order_update = "update " + self.tb_orders + " set trigger_sell_signal=0 where net_position>0 and trigger_sell_signal=1"
+        self.da.execute_command(str_order_update)
+        msg = str(datetime.now()) + "Updating order trigger_sell_signal to 0"
         print print_save_log(self.log, msg)
 
     def portfolio_management(self, daily_portfolio_list, strategy_id):
