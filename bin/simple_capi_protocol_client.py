@@ -50,7 +50,7 @@ class Strategy:
                     is_buy_bool, buy_signal_feed = self.ms.trigger_buy_signal(self.historical_daily_ohlc_np, product_daily, self.current_timestamp, price, today_total_volume)
 
                     if is_buy_bool:
-                        signal_risk_feed = self.ms.money_management(buy_signal_feed, self.historical_daily_ohlc_np)
+                        signal_risk_feed = self.ms.money_management(buy_signal_feed, self.historical_daily_ohlc_np, start_date)
 
             self.ms.signal_risk_market_value = 0
             # self.ms.pnl_management(self.current_timestamp, self.dp.pre_daily_ohlc_dict)
@@ -803,10 +803,10 @@ class ManekiStrategy:
                 self.orders_np = self.dp.load_orders()
         return is_trigger_bool, sell_signal_feed
 
-    def money_management(self, signal_feed, daily_price_ohlc_np):
+    def money_management(self, signal_feed, daily_price_ohlc_np, date_in_argument):
         timestamp, product, buy_sell, signal_price, signal_price_slippage, lot_size, is_portfolio, expect_trade_volume, expect_loss_money, position_limit_money, \
         cash_allow_trade_volume, loss_stop_trade_volume, position_limit_volume, status = \
-            signal_feed[0], signal_feed[1], signal_feed[2], signal_feed[3], 0, 0, True, 0, 0, 0, 0, 0, 0, 0
+            date_in_argument, signal_feed[1], signal_feed[2], signal_feed[3], 0, 0, True, 0, 0, 0, 0, 0, 0, 0
 
         stop_loss_price, stop_loss_atr = self.calculate_stop_loss_price(daily_price_ohlc_np, product, signal_price)
         lot_size = float(self.stock_dict[product])
