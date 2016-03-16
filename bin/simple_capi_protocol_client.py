@@ -99,11 +99,13 @@ class Strategy:
                     order_id = signal_id + "_buy"
                     order = cashAlgoAPI.Order(timestamp, market, product_code, order_id, signal_price_slippage, signal_volume, open_close, buy_sell, action, order_type, order_validity)
                     self.mgr.insertOrder(order)
+                    print_save_log(self.log, "Placed order: order id = " + order_id)
                     print_save_log(self.log, "======================")
                 else:
                     self.ms.available_cash += signal_price_slippage * signal_volume
                     self.ms.holding_cash -= signal_price_slippage * signal_volume
                     self.dp.asset_management(self.ms.cash, self.ms.available_cash, self.ms.holding_cash)
+                    print_save_log(self.log, "Not placed order")
             else:
                  temp_signal_list.append(signal_feed)
 
@@ -269,7 +271,7 @@ class DataProcessing:
         self.da.execute_command(str_signal_update)
         msg = str(datetime.now()) + " Loading signals status, data length: " + str(len(signal_list))
         print_save_log(self.log, msg)
-        print_save_log(self.log, "=====================================================")
+        # print_save_log(self.log, "=====================================================")
         return signal_list
 
     def load_orders(self):
@@ -1094,8 +1096,11 @@ if __name__ == '__main__':
     action_type = sys.argv[1]
     start_date = sys.argv[2]
     try:
-        mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", time.strftime("%Y%m%d"), time.strftime("%Y%m%d"))
-        mgr.start()
+        if action_type == "market_open":
+            mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", time.strftime("%Y%m%d"), time.strftime("%Y%m%d"))
+            mgr.start()
+        elif action_type == "market_close":
+            mgr = None
         myStrategy = Strategy("", mgr, action_type, start_date)
         symbolsRTmonitor = myStrategy.get_symbols_for_realtime_monitoring()
         myStrategy.doMarketAction("", mgr, action_type, start_date)
