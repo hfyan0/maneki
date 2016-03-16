@@ -221,9 +221,12 @@ class DataProcessing:
         msg = str(datetime.now()) + " Asset Management: Cash:" + str(cash) + " available_cash:" + str(
             available_cash) + " holding_cash:" + str(holding_cash)
         print_save_log(self.log, msg)
-        str_update_asset_query = "update  " + self.tb_trading_account + " set cash = " + str(cash) + ", avail_cash=" + str(
-            available_cash) + ", holding_cash=" + str(holding_cash) + ", timestamp = '" + datetime.strftime(
-            datetime.now(), "%Y-%m-%d %H:%M:%S") + "' where strategy_id='" + self.strategy_id + "'"
+
+        # str_update_asset_query = "update  " + self.tb_trading_account + " set cash = " + str(cash) + ", avail_cash=" + str(
+        #     available_cash) + ", holding_cash=" + str(holding_cash) + ", timestamp = '" + datetime.strftime(
+        #     datetime.now(), "%Y-%m-%d %H:%M:%S") + "' where strategy_id='" + self.strategy_id + "'"
+
+        str_update_asset_query = "update " + self.tb_trading_account + " set cash = %s, avail_cash = %s, holding_cash= %s, timestamp = '%s' where strategy_id='%s'" % (cash, available_cash, holding_cash, datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S"), self.strategy_id)
         self.da.execute_command(str_update_asset_query)
 
     def get_market_calendar(self):
