@@ -32,7 +32,7 @@ class Strategy:
 
     def doMarketAction(self, config, mgr, action_type, start_date):
         # today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d") + timedelta(-1), "%Y-%m-%d")
-        today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y-%m-%d")
+        today_date = start_date
         self.daily_adjust_ratio_dict = self.dp.get_daily_adjust_ratio(today_date)
         print "==========================entry market action type=============================="
 
@@ -41,23 +41,30 @@ class Strategy:
             self.dp.load_historical_pre_daily_stock_price(self.dp.historical_daily_price_start_date, today_date)
             self.historical_daily_ohlc_np = np.array(self.dp.historical_daily_ohlc_list)
 
-            for product_daily in self.dp.today_ohlc_price:
-                if product_daily in self.ms.stock_dict.keys():
-                    price = self.dp.today_ohlc_price[product_daily][5]
-                    self.current_timestamp = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-                    today_total_volume = self.dp.today_ohlc_price[product_daily][6]
+            ###################################################
+            # check if no data for today
+            ###################################################
+            today_data_tmp = self.historical_daily_ohlc_np[np.where(self.historical_daily_ohlc_np[:, 0] == datetime.strptime(today_date, "%Y-%m-%d").date())]
+            if len(today_data_tmp) > 0:
+                for product_daily in self.dp.today_ohlc_price:
+                    if product_daily in self.ms.stock_dict.keys():
+                        price = self.dp.today_ohlc_price[product_daily][5]
+                        self.current_timestamp = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+                        today_total_volume = self.dp.today_ohlc_price[product_daily][6]
 
-                    is_buy_bool, buy_signal_feed = self.ms.trigger_buy_signal(self.historical_daily_ohlc_np, product_daily, self.current_timestamp, price, today_total_volume)
+                        is_buy_bool, buy_signal_feed = self.ms.trigger_buy_signal(self.historical_daily_ohlc_np, product_daily, self.current_timestamp, price, today_total_volume)
 
-                    if is_buy_bool:
-                        signal_risk_feed = self.ms.money_management(buy_signal_feed, self.historical_daily_ohlc_np, start_date)
+                        if is_buy_bool:
+                            signal_risk_feed = self.ms.money_management(buy_signal_feed, self.historical_daily_ohlc_np, start_date)
 
-            self.ms.signal_risk_market_value = 0
-            # self.ms.pnl_management(self.current_timestamp, self.dp.pre_daily_ohlc_dict)
-            # self.ms.daily_realized_pnl_dict.clear()
-            print str(self.current_timestamp) + " buy signals already generated."
+                self.ms.signal_risk_market_value = 0
+                # self.ms.pnl_management(self.current_timestamp, self.dp.pre_daily_ohlc_dict)
+                # self.ms.daily_realized_pnl_dict.clear()
+                print str(self.current_timestamp) + " buy signals already generated."
 
-            self.dp.update_order_trigger_sell_signal()
+                self.dp.update_order_trigger_sell_signal()
+            else:
+                print "Today's data not available."
 
         elif action_type == "market_open":
             print "entry market open case"
@@ -348,7 +355,7 @@ class DataProcessing:
         print "start_timestamp: " + start_timestamp + " today_date: " + today_date
 
         str_query = "select timestamp,instrument_id,open,high,low,close,volume from " + self.tb_market_data_daily_hk_stock + " where from_days(to_days(timestamp)) >= '" + str(
-            start_timestamp) + "' and from_days(to_days(timestamp)) < '" + today_date + "' order by timestamp asc;"
+            start_timestamp) + "' and from_days(to_days(timestamp)) <= '" + today_date + "' order by timestamp asc;"
 
         historical_daily_price = self.da.query_command(str_query)
         for stock_price in historical_daily_price:
