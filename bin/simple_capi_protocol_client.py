@@ -524,13 +524,29 @@ class DataProcessing:
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
 
+    def save_signal_to_db_for_sell(self, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, corresponding_buy_order_id):
+        str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+        str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp,corresponding_buy_order_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s','%s')" % (
+            str(signal_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp), str(corresponding_buy_order_id))
+
+        signal_id = self.da.execute_command_with_return(str_signal_query)
+        return signal_id
+
     def save_order_to_db(self, str_order_query):
         self.da.execute_command(str_order_query)
 
     def update_signal(self, signal_id, status, product, trade_price, trade_volume):
         str_signal_update = "update " + self.tb_signals + " set status = 2 where signal_id= %s" % signal_id
         self.da.execute_command(str_signal_update)
-        msg = str(datetime.now()) + " Updating signals status: " + str(status) + ", signal_id: " + str(
+        msg = str(datetime.now()) + " Updating signals status (for buy): " + str(status) + ", signal_id: " + str(
+            signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
+            trade_price) + ", signal volume: " + str(trade_volume)
+        print_save_log(self.log, msg)
+
+    def update_signal_for_sell(self, buy_signal_id, status, product, trade_price, trade_volume):
+        str_signal_update = "update " + self.tb_signals + " set status = 2 where corresponding_buy_order_id= %s" % buy_signal_id
+        self.da.execute_command(str_signal_update)
+        msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", signal_id: " + str(
             signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
             trade_price) + ", signal volume: " + str(trade_volume)
         print_save_log(self.log, msg)
@@ -791,7 +807,7 @@ class ManekiStrategy:
                 signal_comment = "buy_order_id: " + str(buy_order_id) + ", stop_loss_price: " + str(
                     self.stop_loss_price) + " , exit_condition_cv_price_min: " + str(
                     exit_condition_cv_price_min) + ", before_buy_cash: " + str(self.available_cash)
-                sell_signal_id = self.dp.save_signal_to_db(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment)
+                sell_signal_id = self.dp.save_signal_to_db_for_sell(timestamp, status, product, buy_sell, current_price, order_volume, signal_comment, buy_order_id)
                 sell_signal_feed.append(
                     [sell_signal_id, status, timestamp, product, buy_sell, current_price, order_volume, buy_order_id])
                 is_trigger_bool = True
@@ -933,7 +949,10 @@ class ManekiStrategy:
             raw_trade_feed.productCode, int(raw_trade_feed.buySell), raw_trade_feed.price, raw_trade_feed.volumeFilled
 
         trade_feed = [timestamp, product, buy_sell, trade_price, trade_volume, order_id]
-        self.dp.update_signal(order_id, status, product, trade_price, trade_volume)
+        if buy_sell == 1:
+            self.dp.update_signal(order_id, status, product, trade_price, trade_volume)
+        elif buy_sell == 2:
+            self.dp.update_signal_for_sell(order_id, status, product, trade_price, trade_volume)
         if buy_sell == self.CONST_SELL:
             turnover = trade_price * trade_volume
             self.available_cash += turnover
