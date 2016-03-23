@@ -269,7 +269,7 @@ class DataProcessing:
 
     def load_signals(self):
         signal_list = []
-        str_signal_query = "select signal_id,status,timestamp,instrument_id,buy_sell,price,volume from signals where status = 0 and strategy_id='" + self.strategy_id + "'"
+        str_signal_query = "select signal_id,status,timestamp,instrument_id,buy_sell,price,volume from signals where status = 0 and volume > 0 and strategy_id='" + self.strategy_id + "'"
         signals = self.da.query_command(str_signal_query)
         for signal in signals:
             signal_list.append([str(signal[0]), signal[1], signal[2], signal[3], signal[4], signal[5], signal[6]])
