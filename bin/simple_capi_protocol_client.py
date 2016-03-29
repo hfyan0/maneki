@@ -46,6 +46,7 @@ class Strategy:
             self.ms.available_cash += self.ms.holding_cash
             self.ms.holding_cash = 0
             self.dp.asset_management(self.ms.cash, self.ms.available_cash, self.ms.holding_cash)
+            self.dp.update_signal_at_market_close()
 
             ###################################################
             self.dp.load_today_ohlc_stock_price(today_date)
@@ -567,6 +568,12 @@ class DataProcessing:
         msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", signal_id: " + str(
             signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
             trade_price) + ", signal volume: " + str(trade_volume)
+        print_save_log(self.log, msg)
+
+    def update_signal_at_market_close(self):
+        str_signal_update = "update " + self.tb_signals + " set status=3 where status=1"
+        self.da.execute_command(str_signal_update)
+        msg = str(datetime.now()) + " Updating signals status (at market close): update " + self.tb_signals + " set status=3 where status=1"
         print_save_log(self.log, msg)
 
     def update_order_position(self, order_id, net_position, available_position, trigger_sell_signal):
