@@ -219,13 +219,13 @@ class DataProcessing:
     def get_asset_info(self):
         str_asset_query = "select cash,avail_cash,holding_cash from " + self.tb_trading_account + " where strategy_id='" + self.strategy_id + "'"
         asset_info = self.da.query_command(str_asset_query)
-        msg = str(datetime.now()) + " Get Asset Info: cash:" + str(asset_info[0][0]) + ", available cash:" + str(str(asset_info[0][1])) + ", holding cash:" + str(asset_info[0][2])
+        msg = str(datetime.now()) + " Get Asset Info: select from table " + self.tb_trading_account + ": cash:" + str(asset_info[0][0]) + ", available cash:" + str(str(asset_info[0][1])) + ", holding cash:" + str(asset_info[0][2])
         print_save_log(self.log, msg)
         return float(asset_info[0][0]), float(asset_info[0][1]), float(asset_info[0][2])
 
     def asset_management(self, cash, available_cash, holding_cash):
         print "==============================entry asset management============================"
-        msg = str(datetime.now()) + " Asset Management: Cash:" + str(cash) + " available_cash:" + str(
+        msg = str(datetime.now()) + " Asset Management: update table " + self.tb_trading_account + ": Cash:" + str(cash) + " available_cash:" + str(
             available_cash) + " holding_cash:" + str(holding_cash)
         print_save_log(self.log, msg)
 
