@@ -10,6 +10,9 @@ import talib
 import copy
 from datetime import datetime, timedelta
 
+MARKET_OPEN="market_open"
+MARKET_OPEN_TEST="market_open_test"
+MARKET_CLOSE="market_close"
 
 class Strategy:
     # Initialize Strategy
@@ -36,7 +39,7 @@ class Strategy:
         self.daily_adjust_ratio_dict = self.dp.get_daily_adjust_ratio(today_date)
         print "==========================entry market action type=============================="
 
-        if action_type == "market_close":
+        if action_type == MARKET_CLOSE:
             self.dp.load_today_ohlc_stock_price(today_date)
             self.dp.load_historical_pre_daily_stock_price(self.dp.historical_daily_price_start_date, today_date)
             self.historical_daily_ohlc_np = np.array(self.dp.historical_daily_ohlc_list)
@@ -66,7 +69,7 @@ class Strategy:
             else:
                 print "Today's data not available."
 
-        elif action_type == "market_open":
+        elif (action_type == MARKET_OPEN) or (action_type == MARKET_OPEN_TEST):
             print "entry market open case"
             self.dp.load_historical_daily_stock_price(self.dp.historical_daily_price_start_date)
             self.dp.load_historical_hourly_stock_price(self.dp.load_historic_hourly_price_start_date)
@@ -1121,21 +1124,23 @@ def print_save_log(log_file, msg):
 
 if __name__ == '__main__':
     print "Please make sure subscription date and feedcode is correct."
-    # action_type = "market_open"
+    # action_type = MARKET_OPEN
     action_type = sys.argv[1]
     start_date = sys.argv[2]
     try:
-        if action_type == "market_open":
+        if action_type == MARKET_OPEN:
             mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", time.strftime("%Y%m%d"), time.strftime("%Y%m%d"))
             mgr.start()
-        elif action_type == "market_close":
+        elif action_type == MARKET_OPEN_TEST:
+            mgr = None
+        elif action_type == MARKET_CLOSE:
             mgr = None
         myStrategy = Strategy("", mgr, action_type, start_date)
         symbolsRTmonitor = myStrategy.get_symbols_for_realtime_monitoring()
         myStrategy.doMarketAction("", mgr, action_type, start_date)
-        if action_type == "market_close":
+        if action_type == MARKET_CLOSE:
             sys.exit()
-        elif action_type == "market_open":
+        elif action_type == MARKET_OPEN:
             for sym in symbolsRTmonitor:
                 print "Subscribing symbol: " + sym
                 mgr.subscribeMarketData(myStrategy.onMarketDataUpdate, "HKSE", sym)
@@ -1147,6 +1152,39 @@ if __name__ == '__main__':
             mgr.registerTradeFeed(myStrategy.onTradeFeed)
             mgr.registerPortfolioFeed(myStrategy.onPortfolioFeed)
             mgr.registerPnlperffeed(myStrategy.onPnlperffeed)
+        elif action_type == MARKET_OPEN_TEST:
+            # call functions with testing data
+
+            print "action_type: " + MARKET_OPEN_TEST
+            # md = cashAlgoAPI.TradeFeed():
+            # md.timestamp = time.strftime("%Y%m%d") + "_" time.strftime("%H%M%S") + "_000000"
+            # md.productCode = columns[1]
+            # md.lastPrice = float(columns[2])
+            # md.lastVolume = float(columns[3])
+            # md.bidPrice1 = float(columns[5])
+            # md.bidVol1 = float(columns[6])
+            # md.bidPrice2 = float(columns[7])
+            # md.bidVol2 = float(columns[8])
+            # md.bidPrice3 = float(columns[9])
+            # md.bidVol3 = float(columns[10])
+            # md.bidPrice4 = float(columns[11])
+            # md.bidVol4 = float(columns[12])
+            # md.bidPrice5 = float(columns[13])
+            # md.bidVol5 = float(columns[14])
+            # md.askPrice1 = float(columns[16])
+            # md.askVol1 = float(columns[17])
+            # md.askPrice2 = float(columns[18])
+            # md.askVol2 = float(columns[19])
+            # md.askPrice3 = float(columns[20])
+            # md.askVol3 = float(columns[21])
+            # md.askPrice4 = float(columns[22])
+            # md.askVol4 = float(columns[23])
+            # md.askPrice5 = float(columns[24])
+            # md.askVol5 = float(columns[25])
+            # md.previous = 0
+            # md.delta = 0
+            # onMarketDataUpdate("HKSE", "00941", md)
+
         else:
             print "correct arguments"
 
