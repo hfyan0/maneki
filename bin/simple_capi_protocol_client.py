@@ -40,6 +40,14 @@ class Strategy:
         print "==========================entry market action type=============================="
 
         if action_type == MARKET_CLOSE:
+            ###################################################
+            # release all the cash-on-hold in the trading_account table
+            ###################################################
+            self.ms.available_cash += self.ms.holding_cash
+            self.ms.holding_cash = 0
+            self.dp.asset_management(self.ms.cash, self.ms.available_cash, self.ms.holding_cash)
+
+            ###################################################
             self.dp.load_today_ohlc_stock_price(today_date)
             self.dp.load_historical_pre_daily_stock_price(self.dp.historical_daily_price_start_date, today_date)
             self.historical_daily_ohlc_np = np.array(self.dp.historical_daily_ohlc_list)
