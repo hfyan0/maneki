@@ -558,8 +558,8 @@ class DataProcessing:
         str_signal_update = "update " + self.tb_signals + " set status = 2 where signal_id= %s" % signal_id
         self.da.execute_command(str_signal_update)
         msg = str(datetime.now()) + " Updating signals status (for buy): " + str(status) + ", signal_id: " + str(
-            signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
-            trade_price) + ", signal volume: " + str(trade_volume)
+            signal_id) + ", instrument_id:" + str(product) + ", trade price: " + str(
+            trade_price) + ", trade volume: " + str(trade_volume)
         print_save_log(self.log, msg)
 
     def update_signal_for_sell(self, buy_signal_id, status, product, trade_price, trade_volume):
@@ -955,6 +955,7 @@ class ManekiStrategy:
                     net_position = float(avail_volume) + float(individual_order[0][2])
                     str_order_query = "update %s set net_position=%s, stop_loss_price='%s', buy_price=%s, buy_volume=%s, buy_target_volume =%s  where order_id=%s" \
                                       % (self.dp.tb_orders, net_position, stop_loss_price, order_price, avail_volume, net_position, order_id)
+                    self.dp.save_order_to_db(str_order_query)
             else:
                 order_id = trade_feed[5]
                 net_position = float(individual_order[0][2]) - avail_volume
@@ -991,7 +992,7 @@ class ManekiStrategy:
                 order_price = float(individual_order[0][3])
                 self.daily_realized_pnl_dict[product] = pre_realized_pnl + ((trade_price - order_price) * trade_volume)
         else:
-            turnover = trade_price * trade_volume
+            turnover = trade_price * trade_volume * self.slippage_ratio
             self.cash -= turnover
             self.holding_cash -= turnover
             # self.available_cash = self.available_cash - (trade_price * trade_volume)
