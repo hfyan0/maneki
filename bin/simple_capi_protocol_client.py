@@ -606,6 +606,11 @@ class DataProcessing:
 
         return sorted(set(ls_symbols))
 
+    def get_signal_price_and_volume(self, signal_id):
+        str_signal_select = "select price,volume from " + self.tb_signals + " where signal_id= %s" % signal_id
+        px_vol = self.da.query_command(str_signal_select)
+        return px_vol[0][0], px_vol[0][1]
+
 class DataAccess:
     print "****************Start initialize data DataAccess class****************"
 
@@ -992,7 +997,8 @@ class ManekiStrategy:
                 order_price = float(individual_order[0][3])
                 self.daily_realized_pnl_dict[product] = pre_realized_pnl + ((trade_price - order_price) * trade_volume)
         else:
-            turnover = trade_price * trade_volume * self.slippage_ratio
+            signal_price, signal_volume = self.dp.get_signal_price_and_volume(order_id)
+            turnover = signal_price * self.slippage_ratio * trade_volume
             self.cash -= turnover
             self.holding_cash -= turnover
             # self.available_cash = self.available_cash - (trade_price * trade_volume)
