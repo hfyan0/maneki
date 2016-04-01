@@ -558,7 +558,7 @@ class DataProcessing:
     def save_order_to_db(self, str_order_query):
         self.da.execute_command(str_order_query)
 
-    def update_signal(self, signal_id, status, product, trade_price, trade_volume):
+    def update_signal_for_buy(self, signal_id, status, product, trade_price, trade_volume):
         str_signal_update = "update " + self.tb_signals + " set status = 2 where signal_id= %s" % signal_id
         self.da.execute_command(str_signal_update)
         msg = str(datetime.now()) + " Updating signals status (for buy): " + str(status) + ", signal_id: " + str(
@@ -568,7 +568,10 @@ class DataProcessing:
 
     def update_signal_for_sell(self, buy_signal_id, status, product, trade_price, trade_volume):
         str_signal_update = "update " + self.tb_signals + " set status = 2 where corresponding_buy_order_id= %s" % buy_signal_id
+        print "before update_signal_for_sell execute_command"
+        print "SQL stmt: " + str_signal_update
         self.da.execute_command(str_signal_update)
+        print "after update_signal_for_sell execute_command"
         msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", signal_id: " + str(
             signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
             trade_price) + ", signal volume: " + str(trade_volume)
@@ -985,18 +988,26 @@ class ManekiStrategy:
 
         trade_feed = [timestamp, product, buy_sell, trade_price, trade_volume, order_id]
         if buy_sell == 1:
-            self.dp.update_signal(order_id, status, product, trade_price, trade_volume)
+            print "before update_signal_for_buy"
+            self.dp.update_signal_for_buy(order_id, status, product, trade_price, trade_volume)
+            print "after update_signal_for_buy"
         elif buy_sell == 2:
+            print "before update_signal_for_sell"
             self.dp.update_signal_for_sell(order_id, status, product, trade_price, trade_volume)
+            print "after update_signal_for_sell"
         if buy_sell == self.CONST_SELL:
             turnover = trade_price * trade_volume
             self.available_cash += turnover
             self.cash += turnover
+            print "available_cash = " + str(self.available_cash)
+            print "cash = " + str(self.cash)
             pre_realized_pnl = 0
             if product in self.daily_realized_pnl_dict.keys():
                 pre_realized_pnl = self.daily_realized_pnl_dict[product]
+            print "pre_realized_pnl = " + str(pre_realized_pnl)
 
             individual_order = self.orders_np[np.where(self.orders_np[:, 0] == order_id)].tolist()
+            print "len(individual_order) = " + str(len(individual_order))
             if len(individual_order) > 0:
                 order_price = float(individual_order[0][3])
                 self.daily_realized_pnl_dict[product] = pre_realized_pnl + ((trade_price - order_price) * trade_volume)
@@ -1010,7 +1021,9 @@ class ManekiStrategy:
         self.dp.asset_management(self.cash, self.available_cash, self.holding_cash)
 
         if trade_volume > 0:
+            print "before add_trades"
             self.dp.add_trades(trade_feed)
+            print "after add_trades"
             # self.portfolio_management(trade_feed)
         msg = str(datetime.now()) + " Trading management, product: " + product + ", price: " + str(
             trade_price) + ", volume: " + str(trade_volume) + ", buy_sell: " + str(buy_sell)
