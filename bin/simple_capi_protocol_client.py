@@ -535,18 +535,22 @@ class DataProcessing:
         print_save_log(self.log, msg)
         self.hourly_ohlc_list_for_db = []
 
-    def save_signal_to_db(self, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
+    def save_signal_to_db(self, signal_ymd, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment):
         str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+        dt_signal_time = datetime.strptime(signal_ymd, "%Y-%m-%d").replace(hour=16, minute=0)
+        str_signal_time = str(dt_signal_time)
         str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s')" % (
-            str(signal_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp))
+            str_signal_time, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str_signal_time)
 
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
 
-    def save_signal_to_db_for_sell(self, signal_timestamp, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, corresponding_buy_order_id):
+    def save_signal_to_db_for_sell(self, signal_ymd, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, corresponding_buy_order_id):
         str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+        dt_signal_time = datetime.strptime(signal_ymd, "%Y-%m-%d").replace(hour=16, minute=0)
+        str_signal_time = str(dt_signal_time)
         str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp,corresponding_buy_order_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s','%s')" % (
-            str(signal_timestamp), status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str(signal_timestamp), str(corresponding_buy_order_id))
+            str_signal_time, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str_signal_time, str(corresponding_buy_order_id))
 
         signal_id = self.da.execute_command_with_return(str_signal_query)
         return signal_id
