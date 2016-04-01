@@ -998,10 +998,10 @@ class ManekiStrategy:
                 self.daily_realized_pnl_dict[product] = pre_realized_pnl + ((trade_price - order_price) * trade_volume)
         else:
             signal_price, signal_volume = self.dp.get_signal_price_and_volume(order_id)
-            turnover = signal_price * self.slippage_ratio * trade_volume
-            self.cash -= turnover
-            self.holding_cash -= turnover
-            # self.available_cash = self.available_cash - (trade_price * trade_volume)
+            self.cash -= trade_price * trade_volume
+            self.holding_cash -= signal_price * self.slippage_ratio * trade_volume
+            # available_cash was originally subtracted by signal price with slippage, but the actual cost is trade price
+            self.available_cash += (signal_price * self.slippage_ratio - trade_price) * trade_volume
 
         self.dp.asset_management(self.cash, self.available_cash, self.holding_cash)
 
