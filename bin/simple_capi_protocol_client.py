@@ -547,12 +547,8 @@ class DataProcessing:
 
     def save_signal_to_db_for_sell(self, signal_ymd, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, corresponding_buy_order_id):
         str_time_now = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-        # ===============start fixed by kevin  ==============
-        # dt_signal_time = datetime.strptime(signal_ymd, "%Y-%m-%d").replace(hour=16, minute=0)
-        # str_signal_time = str(dt_signal_time)
-
-        str_signal_time = datetime.strftime(signal_ymd, "%Y-%m-%d %H:%M:%S")
-        # ===============end fixed by kevin  ==============
+        dt_signal_time = datetime.strptime(signal_ymd, "%Y-%m-%d").replace(hour=16, minute=0)
+        str_signal_time = str(dt_signal_time)
         str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp,corresponding_buy_order_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s','%s')" % (
             str_signal_time, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str_signal_time, str(corresponding_buy_order_id))
 
@@ -576,16 +572,9 @@ class DataProcessing:
         print "SQL stmt: " + str_signal_update
         self.da.execute_command(str_signal_update)
         print "after update_signal_for_sell execute_command"
-        # ==============start fixed by kevin===================
-        # msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", signal_id: " + str(
-        #    signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
-        #    trade_price) + ", signal volume: " + str(trade_volume)
-
-        msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", buy_signal_id: " + str(
-            buy_signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
+        msg = str(datetime.now()) + " Updating signals status (for sell): " + str(status) + ", signal_id: " + str(
+            signal_id) + ", instrument_id:" + str(product) + ", signal price: " + str(
             trade_price) + ", signal volume: " + str(trade_volume)
-
-        # ==============end fixed by kevin===================
         print_save_log(self.log, msg)
 
     def update_signal_at_market_close(self):
@@ -819,7 +808,6 @@ class ManekiStrategy:
         return is_trigger_bool, signal_feed
 
     def trigger_sell_signal(self, hourly_price_ohlc_np, product, timestamp, current_price):
-
         buy_sell, is_trigger_bool, status, trigger_sell_signal = 2, False, 1, 0
         sell_signal_feed = []
         if len(self.orders_np) == 0:
@@ -827,7 +815,6 @@ class ManekiStrategy:
             return is_trigger_bool, sell_signal_feed
 
         individual_product_order_list_np = self.orders_np[np.where((self.orders_np[:, 1] == product) & (self.orders_np[:, 6] == trigger_sell_signal))]
-
         if len(individual_product_order_list_np) <= 0:
             # print "no specified order "
             return is_trigger_bool, sell_signal_feed
@@ -835,12 +822,10 @@ class ManekiStrategy:
         individual_product_order_list = individual_product_order_list_np.tolist()
 
         hourly_individual_stock_price_ohlc_np = hourly_price_ohlc_np[np.where(hourly_price_ohlc_np[:, 1] == product)]
-
         hourly_individual_stock_price_ohlc_count = len(hourly_individual_stock_price_ohlc_np)
         exit_condition_cv_np = hourly_individual_stock_price_ohlc_np[
                                (hourly_individual_stock_price_ohlc_count - 1) - self.exit_condition_close_price_period:(
                                    hourly_individual_stock_price_ohlc_count - 1), 3:6]
-
         exit_condition_cv_price_min = np.amin(exit_condition_cv_np)
 
         # [order_id, product, float(order_price), float(avail_volume), float(order_volume)]
