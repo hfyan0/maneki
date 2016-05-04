@@ -8,6 +8,7 @@ import MySQLdb
 import numpy as np
 import talib
 import copy
+import os
 from datetime import datetime, timedelta
 
 MARKET_OPEN="market_open"
@@ -36,6 +37,7 @@ class Strategy:
     def doMarketAction(self, config, mgr, action_type, start_date):
         # today_date = datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d") + timedelta(-1), "%Y-%m-%d")
         today_date = start_date
+        self.dp.get_historical_daily_price_start_date(start_date)
         self.daily_adjust_ratio_dict = self.dp.get_daily_adjust_ratio(today_date)
         print "==========================entry market action type=============================="
 
@@ -49,8 +51,15 @@ class Strategy:
             self.dp.update_signal_at_market_close()
 
             ###################################################
-            self.dp.load_today_ohlc_stock_price(today_date)
-            self.dp.load_historical_pre_daily_stock_price(self.dp.historical_daily_price_start_date, today_date)
+            if self.ms.trading_type == "backtest":
+                self.dp.load_today_ohlc_stock_price_from_file(datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y%m%d"))
+                self.dp.load_historical_pre_daily_stock_price_from_file(datetime.strftime(datetime.strptime(self.dp.historical_daily_price_start_date, "%Y-%m-%d"), "%Y%m%d"), datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y%m%d"))
+            elif self.ms.trading_type == "live":
+                self.dp.load_historical_pre_daily_stock_price(self.dp.historical_daily_price_start_date, today_date)
+                self.dp.load_today_ohlc_stock_price(today_date)
+            else:
+                print "trading type error"
+
             self.historical_daily_ohlc_np = np.array(self.dp.historical_daily_ohlc_list)
 
             ###################################################
@@ -80,9 +89,18 @@ class Strategy:
 
         elif (action_type == MARKET_OPEN) or (action_type == MARKET_OPEN_TEST):
             print "entry market open case"
-            self.dp.load_historical_daily_stock_price(self.dp.historical_daily_price_start_date)
-            self.dp.load_historical_hourly_stock_price(self.dp.load_historic_hourly_price_start_date)
-            self.dp.initial_previous_hourly_stock_price(datetime.strptime(today_date, "%Y-%m-%d"))
+
+            if self.ms.trading_type == "backtest":
+                self.dp.load_historical_daily_stock_price_from_file(datetime.strftime(datetime.strptime(self.dp.historical_daily_price_start_date, "%Y-%m-%d"), "%Y%m%d"), datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y%m%d"))
+                self.dp.load_historical_hourly_stock_price_from_file(datetime.strftime(datetime.strptime(self.dp.load_historic_hourly_price_start_date, "%Y-%m-%d"), "%Y%m%d"), datetime.strftime(datetime.strptime(start_date, "%Y-%m-%d"), "%Y%m%d"))
+                self.dp.load_previous_hourly_stock_price_from_file(datetime.strptime(today_date, "%Y-%m-%d"))
+            elif self.ms.trading_type == "live":
+                self.dp.load_historical_daily_stock_price(self.dp.historical_daily_price_start_date)
+                self.dp.load_historical_hourly_stock_price(self.dp.load_historic_hourly_price_start_date)
+                self.dp.load_previous_hourly_stock_price(datetime.strptime(today_date, "%Y-%m-%d"))
+            else:
+                print "trading type error"
+
             self.historical_daily_ohlc_np = np.array(self.dp.historical_daily_ohlc_list)
             self.historical_hourly_ohlc_np = np.array(self.dp.historical_hourly_ohlc_list)
 
@@ -170,16 +188,16 @@ class Strategy:
         '''
         return
 
-    #Process Order
+    # Process Order
     def onOrderFeed(self,order_feed):
         print "========================= entry order_feed================================"
         return
 
-    #Process Trade
+    # Process Trade
     def onTradeFeed(self, trade_feed):
         self.ms.trade_management(trade_feed)
 
-    #Process Position
+    # Process Position
     def onPortfolioFeed(self,portfolioFeed):
         return
 
@@ -214,9 +232,11 @@ class DataProcessing:
         self.trading_hour_start = self.config.get("Trading_Environment", "trading_hour_start")
         self.trading_hour_lunch_start = self.config.get("Trading_Environment", "trading_hour_lunch_start")
         self.trading_hour_lunch_end = self.config.get("Trading_Environment", "trading_hour_lunch_end")
-        self.start_date = self.config.get("Trading_Environment", "start_date")
+        # self.start_date = self.config.get("Trading_Environment", "start_date")
         self.pre_open_allocation_session = self.config.get("Trading_Environment", "pre_open_allocation_session")
         self.strategy_id = self.config.get("Trading_Environment", "strategy_id")
+        self.historical_daily_price_file_path = self.config.get("Trading_Environment", "historical_daily_price_file_path")
+        self.historical_hourly_price_file_path = self.config.get("Trading_Environment", "historical_hourly_price_file_path")
         self.entry_condition_close_ma_change_period = 100
         self.trading_hour_start_int = int(self.trading_hour_start.split(":")[0])
         self.trading_hour_lunch_start_int = int(self.trading_hour_lunch_start.split(":")[0])
@@ -224,9 +244,13 @@ class DataProcessing:
         self.trading_hour_end_int = int(self.trading_hour_end.split(":")[0])
         self.available_stock_dict = self.get_available_stock_list().copy()
         self.market_calendar = self.get_market_calendar()
-        self.historical_daily_price_start_date = self.market_calendar[self.market_calendar.index(self.start_date) - (self.entry_condition_close_ma_change_period + 50)]
-        self.load_historic_hourly_price_start_date = self.market_calendar[self.market_calendar.index(self.start_date) - (int(math.ceil(self.entry_condition_close_ma_change_period / 6)) + 50)]
+        # self.historical_daily_price_start_date = self.market_calendar[self.market_calendar.index(self.start_date) - (self.entry_condition_close_ma_change_period + 50)]
+        # self.load_historic_hourly_price_start_date = self.market_calendar[self.market_calendar.index(self.start_date) - (int(math.ceil(self.entry_condition_close_ma_change_period / 6)) + 50)]
         self.is_adj_open_hourly_ohlc, self.is_adj_open_daily_ohlc = True, True
+
+    def get_historical_daily_price_start_date(self, start_date):
+        self.historical_daily_price_start_date = self.market_calendar[self.market_calendar.index(start_date) - (self.entry_condition_close_ma_change_period + 50)]
+        self.load_historic_hourly_price_start_date = self.market_calendar[self.market_calendar.index(start_date) - (int(math.ceil(self.entry_condition_close_ma_change_period / 6)) + 50)]
 
     def get_asset_info(self):
         str_asset_query = "select cash,avail_cash,holding_cash from " + self.tb_trading_account + " where strategy_id='" + self.strategy_id + "'"
@@ -328,7 +352,7 @@ class DataProcessing:
             len(self.historical_hourly_ohlc_list))
         print_save_log(self.log, msg)
 
-    def initial_previous_hourly_stock_price(self, initial_timestamp):
+    def load_previous_hourly_stock_price(self, initial_timestamp):
         start_hourly_ohlc_trading_hour = datetime.strptime(str(self.market_calendar[self.market_calendar.index(
             datetime.strftime(initial_timestamp, "%Y-%m-%d")) + 1]) + " " + self.trading_hour_start, "%Y-%m-%d %H:%M:%S")
         start_trading_hour = datetime.strptime(
@@ -342,6 +366,29 @@ class DataProcessing:
             self.hourly_ohlc_dict[stock_price[0]] = [start_hourly_ohlc_trading_hour, stock_price[0], stock_price[1],
                                                      stock_price[1], stock_price[1], stock_price[1], 0]
         self.pre_hourly_ohlc_dict = self.hourly_ohlc_dict.copy()
+        msg = str(datetime.now()) + " Loading previous_hourly_stock_price, data length: " + str(
+            len(self.pre_hourly_ohlc_dict))
+        print_save_log(self.log, msg)
+
+    def load_previous_hourly_stock_price_from_file(self, initial_timestamp):
+        start_hourly_ohlc_trading_hour = datetime.strptime(str(self.market_calendar[self.market_calendar.index(
+            datetime.strftime(initial_timestamp, "%Y-%m-%d")) + 1]) + " " + self.trading_hour_start, "%Y-%m-%d %H:%M:%S")
+
+        file_name = datetime.strftime(initial_timestamp, "%Y%m%d") + ".csv"
+        full_name = os.path.join(self.historical_hourly_price_file_path, file_name)
+        with open(full_name, mode="r") as market_hourly_price_file:
+            for line_price in market_hourly_price_file:
+                if not line_price:
+                    print "It's not format market feed."
+                    return
+                else:
+                    md_price = line_price.split(",")
+                    instrument_id = md_price[3]
+                    close_price = float(md_price[7])
+                    self.hourly_ohlc_dict[instrument_id] = [start_hourly_ohlc_trading_hour, instrument_id, close_price, close_price, close_price, close_price, 0]
+
+        self.pre_hourly_ohlc_dict = self.hourly_ohlc_dict.copy()
+
         msg = str(datetime.now()) + " Loading previous_hourly_stock_price, data length: " + str(
             len(self.pre_hourly_ohlc_dict))
         print_save_log(self.log, msg)
@@ -383,6 +430,106 @@ class DataProcessing:
             len(self.historical_daily_ohlc_list))
         print_save_log(self.log, msg)
 
+    def load_historical_pre_daily_stock_price_from_file(self, start_timestamp, end_timestamp):
+        start_timestamp = int(start_timestamp)
+        end_timestamp = int(end_timestamp)
+        files = os.listdir(self.historical_daily_price_file_path)
+        files.sort(self.compare)
+        for name in files:
+            file_date = int(name.split(".")[0])
+            if file_date < start_timestamp or file_date > end_timestamp:
+                continue
+            full_name = os.path.join(self.historical_daily_price_file_path, name)
+            if os.path.isdir(full_name):
+                self.load_historical_pre_daily_stock_price_from_file(start_timestamp, end_timestamp)
+            else:
+                with open(full_name, mode="r") as market_daily_price_file:
+                    for line_price in market_daily_price_file:
+                        if not line_price:
+                            print "It's not format market feed."
+                            return
+                        else:
+                            # timestamp,instrument_id,open,high,low,close,volume
+                            md_price = line_price.split(",")
+                            timestamp = datetime.strptime(md_price[0], "%Y%m%d_%H%M%S_%f")
+                            instrument_id = md_price[3]
+                            open_price = float(md_price[4])
+                            high_price = float(md_price[5])
+                            low_price = float(md_price[6])
+                            close_price = float(md_price[7])
+                            trade_volume = float(md_price[8].replace('\r', '').replace('\n', ''))
+                            self.historical_daily_ohlc_list.append([timestamp.date(), instrument_id, open_price, high_price, low_price, close_price, trade_volume])
+                            if instrument_id not in self.pre_daily_ohlc_dict.keys():
+                                self.pre_daily_ohlc_dict[instrument_id] = [timestamp.date(), instrument_id, open_price, high_price, low_price, close_price, trade_volume]
+        msg = str(datetime.now()) + " Loading historical pre daily stock price, data length: " + str(len(self.pre_daily_ohlc_dict))
+        print_save_log(self.log, msg)
+
+    def load_historical_daily_stock_price_from_file(self, start_timestamp, end_timestamp):
+        start_timestamp = int(start_timestamp)
+        end_timestamp = int(end_timestamp)
+        files = os.listdir(self.historical_daily_price_file_path)
+        files.sort(self.compare)
+        for name in files:
+            file_date = int(name.split(".")[0])
+            if file_date < start_timestamp or file_date > end_timestamp:
+                continue
+            full_name = os.path.join(self.historical_daily_price_file_path, name)
+            if os.path.isdir(full_name):
+                self.load_historical_daily_stock_price_from_file(start_timestamp, end_timestamp)
+            else:
+                with open(full_name, mode="r") as market_daily_price_file:
+                    for line_price in market_daily_price_file:
+                        if not line_price:
+                            print "It's not format market feed."
+                            return
+                        else:
+                            # timestamp,instrument_id,open,high,low,close,volume
+                            md_price = line_price.split(",")
+                            timestamp = datetime.strptime(md_price[0],"%Y%m%d_%H%M%S_%f")
+                            instrument_id = md_price[3]
+                            open_price = float(md_price[4])
+                            high_price = float(md_price[5])
+                            low_price = float(md_price[6])
+                            close_price = float(md_price[7])
+                            trade_volume = float(md_price[8].replace('\r', '').replace('\n', ''))
+                            self.historical_daily_ohlc_list.append([timestamp, instrument_id, open_price, high_price, low_price, close_price, trade_volume])
+        msg = str(datetime.now()) + " Loading historical daily stock price, data length: " + str(
+            len(self.historical_daily_ohlc_list))
+        print_save_log(self.log, msg)
+
+    def load_historical_hourly_stock_price_from_file(self, start_timestamp, end_timestamp):
+        start_timestamp = int(start_timestamp)
+        end_timestamp = int(end_timestamp)
+        files = os.listdir(self.historical_hourly_price_file_path)
+        files.sort(self.compare)
+        for name in files:
+            file_date = int(name.split(".")[0])
+            if file_date < start_timestamp or file_date > end_timestamp:
+                continue
+            full_name = os.path.join(self.historical_hourly_price_file_path, name)
+            if os.path.isdir(full_name):
+                self.load_historical_daily_stock_price_from_file(start_timestamp, end_timestamp)
+            else:
+                with open(full_name, mode="r") as market_daily_price_file:
+                    for line_price in market_daily_price_file:
+                        if not line_price:
+                            print "It's not format market feed."
+                            return
+                        else:
+                            # timestamp,instrument_id,open,high,low,close,volume
+                            md_price = line_price.split(",")
+                            timestamp = datetime.strptime(md_price[0],"%Y%m%d_%H%M%S_%f")
+                            instrument_id = md_price[3]
+                            open_price = float(md_price[4])
+                            high_price = float(md_price[5])
+                            low_price = float(md_price[6])
+                            close_price = float(md_price[7])
+                            trade_volume = float(md_price[8].replace('\r', '').replace('\n', ''))
+                            self.historical_hourly_ohlc_list.append([timestamp, instrument_id, open_price, high_price, low_price, close_price, trade_volume])
+        msg = str(datetime.now()) + " Loading historical hourly stock price, data length: " + str(
+            len(self.historical_hourly_ohlc_list))
+        print_save_log(self.log, msg)
+
     def load_today_ohlc_stock_price(self,today_date):
         str_query = "select timestamp,instrument_id,open,high,low,close,volume from  " + self.tb_market_data_daily_hk_stock + "  where from_days(to_days(timestamp)) = '" + today_date + "'"
         today_ohlc_price = self.da.query_command(str_query)
@@ -391,6 +538,32 @@ class DataProcessing:
                                                                 float(stock_price[2]), float(stock_price[3]),
                                                                 float(stock_price[4]), float(stock_price[5]),
                                                                 float(stock_price[6])]
+        msg = str(datetime.now()) + " Loading today ohlc stock price, data length: " + str(
+            len(self.today_ohlc_price))
+        print_save_log(self.log, msg)
+
+    def load_today_ohlc_stock_price_from_file(self, today_date):
+        file_name = today_date + ".csv"
+        full_name = os.path.join(self.historical_daily_price_file_path, file_name)
+        print "loading today ohlc price: " + full_name
+        with open(full_name, mode="r") as market_daily_price_file:
+            for line_price in market_daily_price_file:
+                if not line_price:
+                    print "It's not format market feed."
+                    return
+                else:
+                    # timestamp,instrument_id,open,high,low,close,volume
+                    md_price = line_price.split(",")
+                    timestamp = datetime.strptime(md_price[0],"%Y%m%d_%H%M%S_%f")
+                    instrument_id = md_price[3]
+                    open_price = float(md_price[4])
+                    high_price = float(md_price[5])
+                    low_price = float(md_price[6])
+                    close_price = float(md_price[7])
+                    trade_volume = float(md_price[8].replace('\r', '').replace('\n', ''))
+
+                    self.today_ohlc_price[instrument_id] = [timestamp.date(), instrument_id, open_price, high_price, low_price, close_price, trade_volume]
+
         msg = str(datetime.now()) + " Loading today ohlc stock price, data length: " + str(
             len(self.today_ohlc_price))
         print_save_log(self.log, msg)
@@ -553,7 +726,7 @@ class DataProcessing:
 
         str_signal_time = datetime.strftime(signal_ymd, "%Y-%m-%d %H:%M:%S")
         # ===============end fixed by kevin  ==============
-        str_signal_query = "insert into " + self.tb_signals + " (timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp,corresponding_buy_order_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s','%s')" % (
+        str_signal_query = "insert into " + self.tb_signals + "(timestamp,status,instrument_id,buy_sell,price,volume,comment,strategy_id,update_timestamp,signal_timestamp,corresponding_buy_order_id) values ('%s',%s,'%s',%s,%s,%s,'%s','%s','%s','%s','%s')" % (
             str_signal_time, status, product, buy_sell, signal_price, expect_trade_volume, signal_comment, self.strategy_id, str_time_now, str_signal_time, str(corresponding_buy_order_id))
 
         signal_id = self.da.execute_command_with_return(str_signal_query)
@@ -597,13 +770,13 @@ class DataProcessing:
     def update_order_position(self, order_id, net_position, available_position, trigger_sell_signal):
         str_order_update = "update " + self.tb_orders + " set available_position=" + str(available_position) + ", trigger_sell_signal=" + str(trigger_sell_signal) + " where order_id=" + str(order_id) + ";"
         self.da.execute_command(str_order_update)
-        msg = str(datetime.now()) + "Updating order available position, order_id: " + str(order_id) + ", trigger_sell_signal=" + str(trigger_sell_signal) + " available_position: " + str(available_position)
+        msg = str(datetime.now()) + " Updating order available position, order_id: " + str(order_id) + ", trigger_sell_signal=" + str(trigger_sell_signal) + " available_position: " + str(available_position)
         print print_save_log(self.log, msg)
 
     def update_order_trigger_sell_signal(self):
         str_order_update = "update " + self.tb_orders + " set trigger_sell_signal=0 where net_position>0 and trigger_sell_signal=1"
         self.da.execute_command(str_order_update)
-        msg = str(datetime.now()) + "Updating order trigger_sell_signal to 0"
+        msg = str(datetime.now()) + " Updating order trigger_sell_signal to 0"
         print print_save_log(self.log, msg)
 
     def portfolio_management(self, daily_portfolio_list, strategy_id):
@@ -628,6 +801,15 @@ class DataProcessing:
         str_signal_select = "select price,volume from " + self.tb_signals + " where signal_id= %s" % signal_id
         px_vol = self.da.query_command(str_signal_select)
         return px_vol[0][0], px_vol[0][1]
+
+    def compare(self, x, y):
+        if x < y:
+            return -1
+        elif x > y:
+            return 1
+        else:
+            return 0
+
 
 class DataAccess:
     print "****************Start initialize data DataAccess class****************"
@@ -725,6 +907,7 @@ class ManekiStrategy:
         self.exit_condition_close_price_period = int(config.get("Buy_Logic", "exit_condition_close_price_period"))
         self.strategy_id = config.get("Trading_Environment", "strategy_id")
         self.slippage_ratio =float(config.get("Trading_Environment", "slippage_ratio"))
+        self.trading_type = config.get("Trading_Environment", "trading_type")
         self.CONST_BUY, self.CONST_SELL = int(1), int(2)
         self.stop_loss_price = 0
         self.signal_risk_market_value = 0
@@ -1183,7 +1366,7 @@ if __name__ == '__main__':
     start_date = sys.argv[2]
     try:
         if action_type == MARKET_OPEN:
-            mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", time.strftime("%Y%m%d"), time.strftime("%Y%m%d"))
+            mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", datetime.strftime(datetime.strptime(sys.argv[2], "%Y-%m-%d"), "%Y%m%d"), datetime.strftime(datetime.strptime(sys.argv[2], "%Y-%m-%d"), "%Y%m%d"))
             mgr.start()
         elif action_type == MARKET_OPEN_TEST:
             mgr = None
