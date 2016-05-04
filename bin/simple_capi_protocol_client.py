@@ -111,6 +111,8 @@ class Strategy:
 
     # Process Market Data
     def onMarketDataUpdate(self,market, code, md):
+        if md.timestamp == "00000000_000000_000000":
+            return 
         # print "*****************************************************************************market data update***********************************************************"
         print md.timestamp + " " + md.productCode +" "+str(md.lastPrice) + " " + str(md.lastVolume)
 
