@@ -10,10 +10,21 @@ import talib
 import copy
 import os
 from datetime import datetime, timedelta
+from socket import socket
 
 MARKET_OPEN="market_open"
-MARKET_OPEN_TEST="market_open_test"
 MARKET_CLOSE="market_close"
+RESET_TBL_FOR_BACKTEST="reset_tbl_for_backtest"
+
+def sendKillSignal():
+    sys.stdout.flush()
+    while True:
+        sock = socket()
+        sock.connect(('127.0.0.1', 60934))
+        sock.send('Kill Me!\n')
+        sock.close()
+        print "inside sendKillSignal"
+        time.sleep(1)
 
 class Strategy:
     # Initialize Strategy
@@ -87,7 +98,7 @@ class Strategy:
             else:
                 print "Today's data not available."
 
-        elif (action_type == MARKET_OPEN) or (action_type == MARKET_OPEN_TEST):
+        elif action_type == MARKET_OPEN:
             print "entry market open case"
 
             if self.ms.trading_type == "backtest":
@@ -106,15 +117,20 @@ class Strategy:
 
             self.signal_list = self.dp.load_signals()
 
+        elif action_type == RESET_TBL_FOR_BACKTEST:
+            print
         else:
             print "The arguments are incorrect."
 
     # Process Market Data
     def onMarketDataUpdate(self,market, code, md):
-        if md.timestamp == "00000000_000000_000000":
-            return 
         # print "*****************************************************************************market data update***********************************************************"
         print md.timestamp + " " + md.productCode +" "+str(md.lastPrice) + " " + str(md.lastVolume)
+        if md.timestamp == "00000000_000000_000000":
+            print "Market data ended. Program exiting..."
+            sys.stdout.flush()
+            sendKillSignal()
+            sys.exit(0)
 
         product, timestamp, open, high, low, close, volume, adjust_ratio = md.productCode, datetime.strptime(md.timestamp, "%Y%m%d_%H%M%S_%f"), md.lastPrice, md.lastPrice, md.lastPrice, md.lastPrice, float(md.lastVolume), 1
         self.current_timestamp = timestamp
@@ -128,7 +144,7 @@ class Strategy:
 
         temp_signal_list = []
         for signal_feed in self.signal_list:
-            timestamp, market, product_code, signal_id, signal_price, signal_volume, open_close, buy_sell, action, order_type, order_validity = datetime.strftime(signal_feed[2], "%Y%m%d_%H%M%S_%f"), \
+            str_timestamp, market, product_code, signal_id, signal_price, signal_volume, open_close, buy_sell, action, order_type, order_validity = datetime.strftime(signal_feed[2], "%Y%m%d_%H%M%S_%f"), \
                 "SEHK", signal_feed[3], str(signal_feed[0]), float(signal_feed[5]), float(signal_feed[6]), "open", int(signal_feed[4]), "insert", "limit_order", "today"
             signal_price_slippage = signal_price * self.ms.slippage_ratio
             if product_code == product:
@@ -136,7 +152,7 @@ class Strategy:
                 if market_data_ohlc[2] <= signal_price_slippage:
                     # md.timestamp, "SEHK", md.productCode, str(self.cnt), md.askPrice1, 1, "open", 1, "insert", "market_order", "today"
                     order_id = signal_id + "_buy"
-                    order = cashAlgoAPI.Order(timestamp, market, product_code, order_id, signal_price_slippage, signal_volume, open_close, buy_sell, action, order_type, order_validity)
+                    order = cashAlgoAPI.Order(str_timestamp, market, product_code, order_id, signal_price_slippage, signal_volume, open_close, buy_sell, action, order_type, order_validity)
                     self.mgr.insertOrder(order)
                     print_save_log(self.log, "Placed order: order id = " + order_id)
                     print_save_log(self.log, "======================")
@@ -160,14 +176,14 @@ class Strategy:
 
         for sell_signal in sell_signal_feed:
             print "trigger sell signal.........................................................................................................."
-            timestamp, market, product_code, buy_order_id, price, volume, open_close, buy_sell, action, order_type, order_validity = datetime.strftime(sell_signal[2], "%Y%m%d_%H%M%S_%f"), \
+            str_timestamp, market, product_code, buy_order_id, price, volume, open_close, buy_sell, action, order_type, order_validity = datetime.strftime(sell_signal[2], "%Y%m%d_%H%M%S_%f"), \
                 "SEHK", sell_signal[3], str(sell_signal[7]), float(sell_signal[5]), float(sell_signal[6]), "open", int(sell_signal[4]), "insert", "market_order", "today"
             order_id = buy_order_id.replace("_buy", "") + "_sell"
-            msg = "timestamp:" + str(timestamp) + ", market:" + str(market) + ", product_code:" + str(product_code) + ", signal_id:" + str(buy_order_id) + ", price:" + str(price) + ", volume:" + str(volume) + \
+            msg = "timestamp:" + str_timestamp + ", market:" + str(market) + ", product_code:" + str(product_code) + ", signal_id:" + str(buy_order_id) + ", price:" + str(price) + ", volume:" + str(volume) + \
                   ", open_close:" + str(open_close) + ", buy_sell:" + str(buy_sell) + ", action:" + str(action) + ", order_type:" + str(order_type) + ", order_validity:" + str(order_validity)
 
             # md.timestamp, "SEHK", md.productCode, str(self.cnt), md.askPrice1, 1, "open", 1, "insert", "market_order", "today"
-            order = cashAlgoAPI.Order(timestamp, market, product_code, order_id, price, volume, open_close, buy_sell, action, order_type, order_validity)
+            order = cashAlgoAPI.Order(str_timestamp, market, product_code, order_id, price, volume, open_close, buy_sell, action, order_type, order_validity)
             self.mgr.insertOrder(order)
             print_save_log(self.log, msg)
 
@@ -782,10 +798,10 @@ class DataProcessing:
         print print_save_log(self.log, msg)
 
     def portfolio_management(self, daily_portfolio_list, strategy_id):
-        str_delete = "delete from " + self.tb_portfolios + " where strategy_id ='" + self.strategy_id + "'"
+        str_delete = "delete from " + self.tb_portfolios + " where strategy_id =" + self.strategy_id + ""
         self.da.execute_command(str_delete)
-        str_insert = "insert into " + self.tb_portfolios + " (instrument_id, volume, avg_price, timestamp, strategy_id) values \
-                    ('%s', %s, %s, '%s','%s');"
+        str_insert = "insert into " + self.tb_portfolios + " (instrument_id, volume, avg_price, timestamp, strategy_id, unrealized_pnl, market_value) values \
+                    (%s, %s, %s, %s, %s, %s, %s);"
         self.da.insert_many_command(daily_portfolio_list, str_insert)
 
     def get_symbols_for_realtime_monitoring(self):
@@ -930,8 +946,11 @@ class ManekiStrategy:
         # stock filtering and > period 100 days
         daily_individual_stock_price_ohlc_np = daily_price_ohlc_np[np.where(daily_price_ohlc_np[:, 1] == product)]
         daily_individual_stock_price_ohlc_count = len(daily_individual_stock_price_ohlc_np)
-        if close_price < 1 or len(daily_individual_stock_price_ohlc_np) <= self.entry_condition_close_ma_change_period:
-            print "condition: 2"
+        if close_price < 1:
+            print "condition: 2a"
+            return is_trigger_bool, signal_feed
+        elif len(daily_individual_stock_price_ohlc_np) <= self.entry_condition_close_ma_change_period:
+            print "condition: 2b"
             return is_trigger_bool, signal_feed
 
         # 100 days mean turnover > 1000000
@@ -1265,7 +1284,7 @@ class ManekiStrategy:
         for portfolio_product in self.portfolio_dict:
             if int(self.portfolio_dict[portfolio_product][0]) > 0:
                 daily_portfolio_list.append([portfolio_product, self.portfolio_dict[portfolio_product][0],
-                                             self.portfolio_dict[portfolio_product][1], timestamp, self.dp.strategy_id])
+                                             self.portfolio_dict[portfolio_product][1], timestamp, int(self.dp.strategy_id), 0, 0])
 
         if len(daily_portfolio_list) > 0:
             self.dp.portfolio_management(daily_portfolio_list, self.dp.strategy_id)
@@ -1370,16 +1389,21 @@ if __name__ == '__main__':
         if action_type == MARKET_OPEN:
             mgr = cashAlgoAPI.CASHOrderManager("Dummy", "DummyUser", "Pa55w0rd", datetime.strftime(datetime.strptime(sys.argv[2], "%Y-%m-%d"), "%Y%m%d"), datetime.strftime(datetime.strptime(sys.argv[2], "%Y-%m-%d"), "%Y%m%d"))
             mgr.start()
-        elif action_type == MARKET_OPEN_TEST:
-            mgr = None
         elif action_type == MARKET_CLOSE:
+            mgr = None
+        else:
             mgr = None
         myStrategy = Strategy("", mgr, action_type, start_date)
         symbolsRTmonitor = myStrategy.get_symbols_for_realtime_monitoring()
         myStrategy.doMarketAction("", mgr, action_type, start_date)
         if action_type == MARKET_CLOSE:
+            sendKillSignal()
             sys.exit()
         elif action_type == MARKET_OPEN:
+            if len(symbolsRTmonitor) == 0:
+                print "No market data subscription symbol. Program exiting..."
+                sendKillSignal()
+                sys.exit()
             for sym in symbolsRTmonitor:
                 print "Subscribing symbol: " + sym
                 mgr.subscribeMarketData(myStrategy.onMarketDataUpdate, "HKSE", sym)
@@ -1391,45 +1415,21 @@ if __name__ == '__main__':
             mgr.registerTradeFeed(myStrategy.onTradeFeed)
             mgr.registerPortfolioFeed(myStrategy.onPortfolioFeed)
             mgr.registerPnlperffeed(myStrategy.onPnlperffeed)
-        elif action_type == MARKET_OPEN_TEST:
-            # call functions with testing data
-
-            print "action_type: " + MARKET_OPEN_TEST
-            # md = cashAlgoAPI.TradeFeed():
-            # md.timestamp = time.strftime("%Y%m%d") + "_" time.strftime("%H%M%S") + "_000000"
-            # md.productCode = columns[1]
-            # md.lastPrice = float(columns[2])
-            # md.lastVolume = float(columns[3])
-            # md.bidPrice1 = float(columns[5])
-            # md.bidVol1 = float(columns[6])
-            # md.bidPrice2 = float(columns[7])
-            # md.bidVol2 = float(columns[8])
-            # md.bidPrice3 = float(columns[9])
-            # md.bidVol3 = float(columns[10])
-            # md.bidPrice4 = float(columns[11])
-            # md.bidVol4 = float(columns[12])
-            # md.bidPrice5 = float(columns[13])
-            # md.bidVol5 = float(columns[14])
-            # md.askPrice1 = float(columns[16])
-            # md.askVol1 = float(columns[17])
-            # md.askPrice2 = float(columns[18])
-            # md.askVol2 = float(columns[19])
-            # md.askPrice3 = float(columns[20])
-            # md.askVol3 = float(columns[21])
-            # md.askPrice4 = float(columns[22])
-            # md.askVol4 = float(columns[23])
-            # md.askPrice5 = float(columns[24])
-            # md.askVol5 = float(columns[25])
-            # md.previous = 0
-            # md.delta = 0
-            # onMarketDataUpdate("HKSE", "00941", md)
+        elif action_type == RESET_TBL_FOR_BACKTEST:
+            myStrategy.da.truncate_table('portfolios')
+            myStrategy.da.truncate_table('trades')
+            myStrategy.da.truncate_table('signals')
+            myStrategy.da.truncate_table('orders')
+            myStrategy.da.truncate_table('daily_pnl')
+            myStrategy.da.truncate_table('intraday_pnl')
+            myStrategy.da.truncate_table('intraday_pnl_per_strategy')
+            myStrategy.da.truncate_table('market_data_intraday')
+            myStrategy.dp.asset_management(1000000, 1000000, 0)
 
         else:
-            print "correct arguments"
+            print "Incorrect arguments"
 
     except Exception, err:
         print err
         # mgr.stop()
-
-
 

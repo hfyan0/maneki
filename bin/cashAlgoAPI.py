@@ -4,20 +4,21 @@ Created on May 2, 2014
 @author: boreaslaw
 '''
 import datetime
-import threading 
+import threading
 import time
 import socket
 
 import CASHSocket
-DISABLE_RESET=False
+DISABLE_RESET=True
 
 class CASHOrderManager(threading.Thread):
     global mdAddress, mdPort, feedAddress, feedPort
     mdAddress      = "127.0.0.1"
-    mdPort         = 55080
+    #mdPort         = 55080
+    mdPort         = 65010
     feedAddress    = "127.0.0.1"
-    feedPort       = 55081
-    
+    feedPort       = 65011
+
     def __init__(self, name, username, password, beginDate = None, endDate = None):
         self.shutdown = False
         threading.Thread.__init__(self)
@@ -51,7 +52,7 @@ class CASHOrderManager(threading.Thread):
         if not DISABLE_RESET:
           self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,reset")
           self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,reset")
-        
+
 #        self.feedSocket.start()
         print "Manager started"
 #       self.inmsgQueue=[] 
@@ -70,58 +71,59 @@ class CASHOrderManager(threading.Thread):
         data2 = order.toCSVString()
         self.ack=False
         self.feedSocket.send(data2)
-        #self.waitAck()
-    def sendACK(self):
+        # self.waitAck()
+    def sendAck(self):
         self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,acknowledgement,0,ihihi")
         return None
 
     def getWorkingOrders(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_working_orders,today")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def getTradeHistory(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_trade_history,today")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def getPnL(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_PnL,today")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def getDailyPerformance(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_daily_performance,today")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def getAccumPerformance(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_accum_performance,20130201,20130205")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def getPnLPerformance(self):
         self.ack=False
         self.feedSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,portfolio_get_pnl_performance,today")
-        #self.waitAck()
+        # self.waitAck()
         return None
     
     def subscribeMarketData(self, MarketDataHandler, market, code):
         o = SubscriptionObject(market, code, MarketDataHandler)
         currentTime = datetime.datetime.today()
         try:
-            #self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,subscription," + market + "," + code + "," + self.beginDate + "," + self.endDate+ ",ack_mode=YES")
-            self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,subscription," + market + "," + code + "," + self.beginDate + "," + self.endDate)
+            # self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,subscription," + market + "," + code + "," + self.beginDate + "," + self.endDate+ ",ack_mode=YES")
+            self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,subscription," + market + "," + code + "," + self.beginDate + "," + self.endDate+ ",replay_speed=1000")
+            # self.mdSocket.send(time.strftime("%Y%m%d_%H%M%S_") + "000000,subscription," + market + "," + code + "," + self.beginDate + "," + self.endDate)
             self.mdSubscription.append(o)
             print "Subscription OKAY"
         except socket.error, e:
             print e
-            print "Subscription Failed"        
+            print "Subscription Failed"
     
     def registerOrderFeed(self, OrderFeedHandler):
         self.oFeedSubscription.append(OrderFeedHandler)
@@ -150,7 +152,7 @@ class CASHOrderManager(threading.Thread):
         for q in self.mdSubscription:
             if rtmd.productCode == q.code:
                 q.handler(q.market, q.code, rtmd)
-#       self.sendACK()
+#       self.sendAck()
 #         self.feedSocket.send(columns[0] + ",marketfeed," + columns[1])
         for order in self.pendingOrders:
             data = order.toCSVString()
@@ -160,7 +162,7 @@ class CASHOrderManager(threading.Thread):
                 print e
                 print "Insert Order Failed"
         self.pendingOrders = []
-        self.sendACK() 
+        self.sendAck() 
     def _forwardFeed(self, data):
 #       print data
         if (data == "ping"):
@@ -198,7 +200,7 @@ class CASHOrderManager(threading.Thread):
                     q(of)
                 except TypeError, e:
                     print e
-         #   self.sendACK()
+            # self.sendAck()
         elif columns[1] == "tradefeed":
             tf = TradeFeed(data)
             for q in self.tFeedSubscription:
@@ -206,7 +208,7 @@ class CASHOrderManager(threading.Thread):
                     q(tf)
                 except TypeError, e:
                     print e
-        #    self.sendACK() 
+            # self.sendAck()
         elif columns[1] == "portfoliofeed":
             pf = PortfolioFeed(data)
             for q in self.pFeedSubscription:
@@ -217,7 +219,7 @@ class CASHOrderManager(threading.Thread):
         elif columns[1] == "pnlperffeed":
             pnlf = Pnlperffeed(data)
             for q in self.pnlperffeedSubscription:
-                try: 
+                try:
                    q(pnlf)
                 except TypeError, e:
                    print e
@@ -231,7 +233,7 @@ class CASHOrderManager(threading.Thread):
             for q in self.mdSubscription:
                if rtmd.productCode == q.code:
                    q.handler(q.market, q.code, rtmd)
-#       self.sendACK()
+#       self.sendAck()
 #         self.feedSocket.send(columns[0] + ",marketfeed," + columns[1])
 #            for order in self.pendingOrders:
 #               data2 = order.toCSVString()
@@ -242,11 +244,11 @@ class CASHOrderManager(threading.Thread):
 #                   print "Insert Order Failed"
 #               time.sleep(0.001)
             self.pendingOrders = []
-            self.sendACK()
-    
+            self.sendAck()
+
     def run(self):
         pass
-    
+
     def stop(self):
         self.mdSocket.destroyConnection()
         self.feedSocket.destroyConnection()
@@ -270,7 +272,7 @@ class Order:
     def toCSVString(self):
         return self.timestamp + ",signalfeed," + self.market + "," + self.productCode + "," \
             + self.orderID + "," + str(self.price) + "," + str(self.volume) + "," + self.openClose + "," \
-            + str(self.buySell) + ","+self.action +"," + self.orderType + "," + self.orderValidity 
+            + str(self.buySell) + ","+self.action +"," + self.orderType + "," + self.orderValidity
 
 class SubscriptionObject:
     def __init__(self, market, code, handler):
