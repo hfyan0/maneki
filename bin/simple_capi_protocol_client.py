@@ -1416,15 +1416,22 @@ if __name__ == '__main__':
             mgr.registerPortfolioFeed(myStrategy.onPortfolioFeed)
             mgr.registerPnlperffeed(myStrategy.onPnlperffeed)
         elif action_type == RESET_TBL_FOR_BACKTEST:
-            myStrategy.da.truncate_table('portfolios')
-            myStrategy.da.truncate_table('trades')
-            myStrategy.da.truncate_table('signals')
-            myStrategy.da.truncate_table('orders')
-            myStrategy.da.truncate_table('daily_pnl')
-            myStrategy.da.truncate_table('intraday_pnl')
-            myStrategy.da.truncate_table('intraday_pnl_per_strategy')
-            myStrategy.da.truncate_table('market_data_intraday')
-            myStrategy.dp.asset_management(1000000, 1000000, 0)
+            config = ConfigParser.ConfigParser()
+            config.read("../conf/sample1_strategy_param.ini")
+            tb_portfolios = self.config.get("Database", "tb_portfolios")
+            tb_trades = self.config.get("Database", "tb_trades")
+            tb_signals = self.config.get("Database", "tb_signals")
+            tb_orders = self.config.get("Database", "tb_orders")
+            tb_daily_pnl = self.config.get("Database", "tb_daily_pnl")
+            initial_capital = self.config.get("Trading_Environment", "initial_capital")
+
+            myStrategy.da.truncate_table(tb_portfolios)
+            myStrategy.da.truncate_table(tb_trades)
+            myStrategy.da.truncate_table(tb_signals)
+            myStrategy.da.truncate_table(tb_orders)
+            myStrategy.da.truncate_table(tb_daily_pnl)
+            myStrategy.dp.asset_management(initial_capital, initial_capital, 0)
+
 
         else:
             print "Incorrect arguments"
