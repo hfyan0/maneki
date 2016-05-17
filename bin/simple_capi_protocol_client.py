@@ -1418,12 +1418,12 @@ if __name__ == '__main__':
         elif action_type == RESET_TBL_FOR_BACKTEST:
             config = ConfigParser.ConfigParser()
             config.read("../conf/sample1_strategy_param.ini")
-            tb_portfolios = self.config.get("Database", "tb_portfolios")
-            tb_trades = self.config.get("Database", "tb_trades")
-            tb_signals = self.config.get("Database", "tb_signals")
-            tb_orders = self.config.get("Database", "tb_orders")
-            tb_daily_pnl = self.config.get("Database", "tb_daily_pnl")
-            initial_capital = self.config.get("Trading_Environment", "initial_capital")
+            tb_portfolios = config.get("Database", "tb_portfolios")
+            tb_trades = config.get("Database", "tb_trades")
+            tb_signals = config.get("Database", "tb_signals")
+            tb_orders = config.get("Database", "tb_orders")
+            tb_daily_pnl = config.get("Database", "tb_daily_pnl")
+            initial_capital = config.get("Trading_Environment", "initial_capital")
 
             myStrategy.da.truncate_table(tb_portfolios)
             myStrategy.da.truncate_table(tb_trades)
